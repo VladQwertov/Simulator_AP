@@ -1,0 +1,79 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum SessionStatus {
+  IN_PROGRESS
+  FINISHED
+}
+
+enum Role {
+  USER
+  OPPONENT
+}
+
+model Scenario {
+  id               String     @id @default(cuid())
+  title            String
+  domain           String
+  difficulty       Difficulty @default(MEDIUM)
+  opponentTone     String
+  opponentRole     String
+  opponentGoals    String
+  openingLine      String
+  successCriteria  String
+  isPublished      Boolean    @default(true)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  sessions Session[]
+}
+
+model Session {
+  id            String        @id @default(cuid())
+  scenarioId    String
+  scenario      Scenario      @relation(fields: [scenarioId], references: [id])
+  status        SessionStatus @default(IN_PROGRESS)
+  turns         Turn[]
+  feedback      Feedback?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([scenarioId])
+}
+
+model Turn {
+  id         String   @id @default(cuid())
+  sessionId  String
+  session    Session  @relation(fields: [sessionId], references: [id])
+  role       Role
+  text       String
+  score      Int?
+  scoreNotes String?
+  createdAt  DateTime @default(now())
+
+  @@index([sessionId])
+}
+
+model Feedback {
+  id           String   @id @default(cuid())
+  sessionId    String   @unique
+  session      Session  @relation(fields: [sessionId], references: [id])
+  outcome      String
+  summary      String
+  strengths    String
+  improvements String
+  overallScore Int
+  createdAt    DateTime @default(now())
+}
