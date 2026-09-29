@@ -30,6 +30,31 @@ npm run dev
 
 Приложение — на [http://localhost:3000](http://localhost:3000), админка — на `/admin`.
 
+## База данных
+
+Приложению нужна PostgreSQL — без неё API-роуты и админка не заработают.
+
+Проще всего поднять её в Docker-контейнере: в репозитории есть готовый пример —
+[`docker-compose-pg.yml`](./docker-compose-pg.yml) (Postgres 16, порт 5432, реквизиты
+`postgres`/`postgres`/`simulator_ap` — совпадают со строкой подключения по умолчанию в
+`.env.example`).
+
+```bash
+docker compose -f docker-compose-pg.yml up -d
+```
+
+Дальше на поднятую базу накатываются миграции Prisma — они создают таблицы по схеме
+[`prisma/schema.prisma`](./prisma/schema.prisma):
+
+```bash
+npx prisma migrate deploy
+```
+
+Строка подключения — ключ `DATABASE_URL` — прописывается в `.env` (скопируйте `.env.example` →
+`.env`, см. шаг 3 быстрого старта выше). Если используете `docker-compose-pg.yml` как есть, менять
+её не нужно — значение по умолчанию уже на него указывает. Если вместо Docker поднимаете свою или
+внешнюю PostgreSQL — впишите в `DATABASE_URL` её реальные адрес/логин/пароль/имя базы.
+
 ## Тесты и проверки
 
 ```bash
