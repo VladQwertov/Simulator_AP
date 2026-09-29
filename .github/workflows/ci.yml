@@ -1,0 +1,66 @@
+name: CI
+
+# Запускается на пуш в любую ветку и на PR в main — так каждая feature-ветка получает
+# собственный статус проверок ещё до слияния, а не только main после факта.
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+# DATABASE_URL нужен только для того, чтобы Prisma Client мог быть инициализирован во время
+# `next build` (он строит схему из DATASOURCE_URL, но по факту к базе не обращается — все
+# страницы, которые читают БД, помечены как ƒ Dynamic и рендерятся по запросу, а не при сборке).
+# MOCK_LLM=true — тесты и сборка идут полностью офлайн, без реального ключа Groq API.
+env:
+  DATABASE_URL: postgresql://postgres:postgres@localhost:5432/simulator_ap
+  MOCK_LLM: "true"
+
+jobs:
+  typecheck:
+    name: Типы (tsc)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npx tsc --noEmit
+
+  lint:
+    name: Lint (eslint)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  test:
+    name: Тесты (vitest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run test
+
+  build:
+    name: Сборка (next build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run build
