@@ -1,36 +1,48 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Арена переговоров
 
-## Getting Started
+Интерактивный симулятор развития навыков переговоров — хакатон-проект (ТЗ: «Алабуга», «Симулятор развития навыков переговоров "Арена переговоров"», 2026).
 
-First, run the development server:
+Полное описание продукта, архитектуры и логики симуляции — в [`DOCUMENTATION.md`](./DOCUMENTATION.md). Этот файл — только быстрый старт.
+
+## Быстрый старт (локальный запуск)
+
+Понадобится Node.js 20+ и Docker (для базы данных; вместо Docker можно указать любой другой PostgreSQL в `DATABASE_URL`).
 
 ```bash
+# 1. Зависимости
+npm install
+
+# 2. База данных (Postgres в Docker)
+docker compose -f docker-compose-pg.yml up -d
+
+# 3. Переменные окружения
+cp .env.example .env
+# GROQ_API_KEY не обязателен — без него (или при MOCK_LLM="true") движок работает
+# полностью офлайн на детерминированных fallback-заглушках, ничего не ломается.
+
+# 4. Схема БД и демо-данные
+npx prisma migrate deploy
+npx prisma db seed
+
+# 5. Запуск
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Приложение — на [http://localhost:3000](http://localhost:3000), админка — на `/admin`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Тесты и проверки
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm run test       # vitest, юнит + интеграционные тесты движка и API
+npx tsc --noEmit    # типы
+npm run lint        # eslint
+npm run build       # прод-сборка
+```
 
-## Learn More
+## Структура
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `app/` — Next.js App Router: страницы (`/`, `/scenario/[id]`, `/play/[sessionId]`, `/admin`) и API-роуты
+- `lib/engine/` — детерминированный игровой движок (состояние, правила, переходы, оценка) — без обращений к БД или LLM
+- `lib/llm/` — промпты и клиент для LLM (Groq) с fallback-режимом на каждую функцию
+- `prisma/` — схема БД, миграции, сид демо-сценариев
+- `avatar-video/` — отдельный Remotion-проект для рендера видео-аватара оппонента (не часть основного приложения, использовался офлайн для генерации `public/avatar/*.mp4`)

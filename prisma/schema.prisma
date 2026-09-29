@@ -23,57 +23,115 @@ enum Role {
   OPPONENT
 }
 
-model Scenario {
-  id               String     @id @default(cuid())
-  title            String
-  domain           String
-  difficulty       Difficulty @default(MEDIUM)
-  opponentTone     String
-  opponentRole     String
-  opponentGoals    String
-  openingLine      String
-  successCriteria  String
-  isPublished      Boolean    @default(true)
-  createdAt        DateTime   @default(now())
-  updatedAt        DateTime   @updatedAt
+enum StageType {
+  CONTACT
+  DISCOVERY
+  PITCH
+  OBJECTION
+  CLOSING
+}
 
+model Scenario {
+  id              String     @id @default(cuid())
+  title           String
+  domain          String
+  playerRole      String     @default("") // кто игрок в этом сценарии — видно на экране контекста
+  situation       String     @default("") // исходная ситуация ("где я, зачем эта встреча") — видно на экране контекста
+  difficulty      Difficulty @default(MEDIUM)
+  successCriteria String
+  isPublished     Boolean    @default(true)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  levels   Level[]
   sessions Session[]
 }
 
+// Отдельная игровая задача/этап переговоров (например "Менеджер" -> "ЛПР" -> "Закрытие").
+// opponentRole/opponentTone/opponentGoals/openingLine живут здесь, а не в Scenario,
+// потому что на разных уровнях может быть разный персонаж NPC.
+model Level {
+  id               String   @id @default(cuid())
+  scenarioId       String
+  scenario         Scenario @relation(fields: [scenarioId], references: [id])
+  order            Int
+  title            String
+  opponentRole     String
+  opponentTone     String
+  opponentGoals    String
+  objective        String
+  openingLine      String
+  maxRounds        Int      @default(6)
+  advanceThreshold Int      @default(70)
+  failThreshold    Int      @default(20)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  stages Stage[]
+
+  @@unique([scenarioId, order])
+  @@index([scenarioId])
+}
+
+// Подэтап внутри уровня. `type` — фиксированный каталог, на который завязаны
+// детерминированные правила движка (lib/engine/rules.ts); title/description — только флавор для UI/промптов.
+model Stage {
+  id          String    @id @default(cuid())
+  levelId     String
+  level       Level     @relation(fields: [levelId], references: [id])
+  order       Int
+  type        StageType
+  title       String?
+  description String?
+
+  @@unique([levelId, order])
+  @@index([levelId])
+}
+
 model Session {
-  id            String        @id @default(cuid())
-  scenarioId    String
-  scenario      Scenario      @relation(fields: [scenarioId], references: [id])
-  status        SessionStatus @default(IN_PROGRESS)
-  turns         Turn[]
-  feedback      Feedback?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id         String        @id @default(cuid())
+  scenarioId String
+  scenario   Scenario      @relation(fields: [scenarioId], references: [id])
+  status     SessionStatus @default(IN_PROGRESS)
+  state      Json // NegotiationState (lib/engine/types.ts), снапшот целиком
+  turns      Turn[]
+  feedback   Feedback?
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
 
   @@index([scenarioId])
 }
 
 model Turn {
-  id         String   @id @default(cuid())
-  sessionId  String
-  session    Session  @relation(fields: [sessionId], references: [id])
-  role       Role
-  text       String
-  score      Int?
-  scoreNotes String?
-  createdAt  DateTime @default(now())
+  id            String   @id @default(cuid())
+  sessionId     String
+  session       Session  @relation(fields: [sessionId], references: [id])
+  role          Role
+  text          String
+  levelOrder    Int?
+  stageOrder    Int?
+  actionType    String?
+  actionQuality Int?
+  score         Int?
+  scoreNotes    String?
+  createdAt     DateTime @default(now())
 
   @@index([sessionId])
 }
 
 model Feedback {
-  id           String   @id @default(cuid())
-  sessionId    String   @unique
-  session      Session  @relation(fields: [sessionId], references: [id])
-  outcome      String
-  summary      String
-  strengths    String
-  improvements String
-  overallScore Int
-  createdAt    DateTime @default(now())
+  id                   String   @id @default(cuid())
+  sessionId            String   @unique
+  session              Session  @relation(fields: [sessionId], references: [id])
+  outcome              String
+  summary              String
+  strengths            String
+  improvements         String
+  overallScore         Int
+  perLevelBreakdown    Json? // прогресс по номерованным Level (было)
+  stageBreakdown       Json? // разбор по типу этапа (Контакт/Выявление потребности/... ), см. lib/engine/feedbackFacts.ts
+  keyMomentQuote       String? // дословная реплика игрока, ставшая переломным моментом (может отсутствовать)
+  keyMomentExplanation String?
+  betterAnswer         String? // пример более сильной формулировки
+  createdAt            DateTime @default(now())
 }

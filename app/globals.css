@@ -1,26 +1,69 @@
 @import "tailwindcss";
 
+/* Светлая палитра в духе poised.com: тёмно-индиговый текст на белом/лавандовом фоне,
+   один фиолетовый акцент — вместо auto-dark-mode, который раньше красил весь сайт в чёрный
+   по prefers-color-scheme и путал пользователя. */
 :root {
   --background: #ffffff;
-  --foreground: #171717;
+  --background-soft: #f6f4fe;
+  --foreground: #1c1633;
+  --muted: #5b5570;
+  --subtle: #8a84a0;
+  --primary: #5b4fe6;
+  --primary-hover: #4a3fd1;
+  --primary-soft: #eeecfc;
+  --border: #e8e5f5;
+  --accent-pink: #fbe4ec;
+  --accent-blue: #dff1fc;
 }
 
 @theme inline {
   --color-background: var(--background);
+  --color-background-soft: var(--background-soft);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-muted: var(--muted);
+  --color-subtle: var(--subtle);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-soft: var(--primary-soft);
+  --color-border: var(--border);
+  --color-accent-pink: var(--accent-pink);
+  --color-accent-blue: var(--accent-blue);
+  --font-sans: var(--font-sans-base);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans-base), Arial, Helvetica, sans-serif;
+}
+
+/* Появление карточек по очереди (stagger задаётся через --delay инлайн-стилем на элементе). */
+@keyframes fade-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-slide-up {
+  animation: fade-slide-up 0.35s ease-out both;
+  animation-delay: var(--delay, 0ms);
+}
+
+/* "Звуковая волна" вокруг видео, пока оппонент говорит — дополняет ускорение playbackRate
+   самого ролика (см. Avatar.tsx) видимым кольцевым индикатором (два кольца со сдвигом). */
+@keyframes avatar-wave-ring {
+  0% {
+    transform: scale(1);
+    opacity: 0.55;
+  }
+  100% {
+    transform: scale(1.35);
+    opacity: 0;
+  }
 }
