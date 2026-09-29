@@ -27,6 +27,10 @@ jobs:
           node-version: 20
           cache: npm
       - run: npm ci
+      # tsc сам не видит глобальные типы роутов (LayoutProps/PageProps) — Next.js генерирует их
+      # в .next/types только во время `next build`/`next dev`. `next typegen` делает то же самое
+      # без полной сборки, специально для случаев вроде отдельного typecheck-шага в CI.
+      - run: npx next typegen
       - run: npx tsc --noEmit
 
   lint:
