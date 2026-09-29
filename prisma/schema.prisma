@@ -75,6 +75,19 @@ model Level {
 
 // Подэтап внутри уровня. `type` — фиксированный каталог, на который завязаны
 // детерминированные правила движка (lib/engine/rules.ts); title/description — только флавор для UI/промптов.
+//
+// Ветвление (lib/engine/transition.ts): несколько Stage могут делить один и тот же `order` внутри
+// уровня — это развилка. У stage основного (неразветвлённого) пути branchKey = null. У пары
+// стадий-вариантов на развилке branchKey = "soft" | "hard": движок детерминированно выбирает,
+// какую из них показать игроку, по накопленному за уровень балансу мягких (RAPPORT/CONCESSION) и
+// жёстких (PRESSURE/ARGUMENT) действий игрока (см. NegotiationState.branchSignal). Выбор
+// фиксируется на весь уровень в NegotiationState.branch — сюжет не "прыгает" между вариантами.
+//
+// @@unique ниже — [levelId, order, branchKey], а не просто [levelId, order]: Postgres не считает
+// два NULL равными в unique-индексе, так что несколько строк с одним order и branchKey=null
+// технически не запрещены на уровне БД. На практике единственный источник данных — сид/админка,
+// которые сами не создают такие дубликаты, поэтому это осознанно принятый компромисс, а не
+// полноценный constraint (полный вариант потребовал бы partial unique index вне Prisma schema DSL).
 model Stage {
   id          String    @id @default(cuid())
   levelId     String
@@ -83,8 +96,9 @@ model Stage {
   type        StageType
   title       String?
   description String?
+  branchKey   String? // null = основной путь; "soft" | "hard" = вариант развилки на этом order
 
-  @@unique([levelId, order])
+  @@unique([levelId, order, branchKey])
   @@index([levelId])
 }
 
@@ -103,18 +117,23 @@ model Session {
 }
 
 model Turn {
-  id            String   @id @default(cuid())
+  id            String     @id @default(cuid())
   sessionId     String
-  session       Session  @relation(fields: [sessionId], references: [id])
+  session       Session    @relation(fields: [sessionId], references: [id])
   role          Role
   text          String
   levelOrder    Int?
   stageOrder    Int?
+  // Записывается напрямую из уже посчитанного Engine-состояния в момент создания хода
+  // (lib/engine, NegotiationState.stageProgress.type / текущий Stage), а не резолвится задним
+  // числом по (levelOrder, stageOrder): при ветвлении сценария несколько Stage могут делить один
+  // order внутри уровня, и такой резолв по одному order стал бы неоднозначным.
+  stageType     StageType?
   actionType    String?
   actionQuality Int?
   score         Int?
   scoreNotes    String?
-  createdAt     DateTime @default(now())
+  createdAt     DateTime   @default(now())
 
   @@index([sessionId])
 }

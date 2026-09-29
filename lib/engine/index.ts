@@ -3,6 +3,7 @@
 // Внутри — только apply.ts/transition.ts. Никакого обращения к БД и никакого LLM.
 import { applyAction } from "./apply";
 import { evaluateTransition, type TransitionKind } from "./transition";
+import { findStageByOrder } from "./util";
 import type { ActionType, LevelWithStages, NegotiationState } from "./types";
 
 export interface ProcessTurnInput {
@@ -22,7 +23,7 @@ export interface ProcessTurnResult {
 export function processTurn(input: ProcessTurnInput): ProcessTurnResult {
   const { state, level, nextLevel, actionType, quality } = input;
 
-  const currentStage = level.stages.find((s) => s.order === state.currentStageOrder);
+  const currentStage = findStageByOrder(level.stages, state.currentStageOrder, state.branch);
   if (!currentStage) {
     throw new Error(`Stage order=${state.currentStageOrder} not found in level order=${level.order}`);
   }
@@ -46,4 +47,5 @@ export { STAGE_TYPE_LABEL, buildStageBreakdown, pickKeyMoment } from "./feedback
 export type { FeedbackTurnFact, StageBreakdownFact, KeyMomentFact } from "./feedbackFacts";
 export { deriveOpponentMood } from "./mood";
 export type { OpponentMood } from "./mood";
+export { findStageByOrder } from "./util";
 export * from "./types";

@@ -22,6 +22,115 @@ const levelTwo = makeLevel({
   stages: [makeStage({ order: 1, type: "PITCH" })],
 });
 
+// Развилка сразу после единственной вступительной стадии: order=2 делят два варианта OBJECTION.
+const forkedLevel = makeLevel({
+  order: 1,
+  title: "Forked Level",
+  opponentGoals: "Forked Level goals",
+  maxRounds: 6,
+  advanceThreshold: 70,
+  failThreshold: 20,
+  stages: [
+    makeStage({ order: 1, type: "CONTACT" }),
+    makeStage({ order: 2, type: "OBJECTION", branchKey: "soft" }),
+    makeStage({ order: 2, type: "OBJECTION", branchKey: "hard" }),
+  ],
+});
+
+describe("evaluateTransition — ветвление сценария", () => {
+  it("выбирает soft-вариант при преобладании мягких действий (branchSignal)", () => {
+    const state = makeState({
+      currentStageOrder: 1,
+      stageProgress: { order: 1, type: "CONTACT", progress: 100, attempts: 2 },
+      round: 2,
+      branchSignal: { soft: 3, hard: 1 },
+    });
+
+    const { transition, state: next } = evaluateTransition(state, forkedLevel, null);
+
+    expect(transition).toBe("advance-stage");
+    expect(next.branch).toBe("soft");
+    expect(next.currentStageOrder).toBe(2);
+    expect(next.stageProgress).toEqual({ order: 2, type: "OBJECTION", progress: 0, attempts: 0 });
+  });
+
+  it("выбирает hard-вариант при преобладании жёстких действий (branchSignal)", () => {
+    const state = makeState({
+      currentStageOrder: 1,
+      stageProgress: { order: 1, type: "CONTACT", progress: 100, attempts: 2 },
+      round: 2,
+      branchSignal: { soft: 1, hard: 3 },
+    });
+
+    const { state: next } = evaluateTransition(state, forkedLevel, null);
+
+    expect(next.branch).toBe("hard");
+  });
+
+  it("при равном счёте (или его отсутствии) по умолчанию выбирает soft", () => {
+    const state = makeState({
+      currentStageOrder: 1,
+      stageProgress: { order: 1, type: "CONTACT", progress: 100, attempts: 1 },
+      round: 1,
+      branchSignal: { soft: 0, hard: 0 },
+    });
+
+    const { state: next } = evaluateTransition(state, forkedLevel, null);
+
+    expect(next.branch).toBe("soft");
+  });
+
+  it("однажды выбранная ветка не пересматривается на следующих ходах внутри неё", () => {
+    // Уже в hard-ветке (order=2, branchKey=hard); branchSignal с тех пор сместился в сторону soft,
+    // но branch зафиксирован при входе в стадию и не должен смениться.
+    const state = makeState({
+      currentLevelOrder: 1,
+      currentStageOrder: 2,
+      stageProgress: { order: 2, type: "OBJECTION", progress: 100, attempts: 2 },
+      round: 4,
+      branch: "hard",
+      branchSignal: { soft: 5, hard: 1 },
+      negotiation: { agreementProbability: 90, outcome: null },
+    });
+
+    const { transition, state: next } = evaluateTransition(state, forkedLevel, null);
+
+    expect(transition).toBe("finish");
+    expect(next.negotiation.outcome).toBe("deal");
+  });
+
+  it("levelHistory фиксирует, какая ветка была выбрана на уровне", () => {
+    const state = makeState({
+      currentLevelOrder: 1,
+      currentStageOrder: 2,
+      stageProgress: { order: 2, type: "OBJECTION", progress: 100, attempts: 2 },
+      round: 4,
+      branch: "soft",
+      negotiation: { agreementProbability: 80, outcome: null },
+    });
+
+    const { state: next } = evaluateTransition(state, forkedLevel, null);
+
+    expect(next.levelHistory[0].branch).toBe("soft");
+  });
+
+  it("состояние без branch/branchSignal (сессии до появления ветвления) не падает — трактуется как soft/{0,0}", () => {
+    const legacyState = makeState({
+      currentStageOrder: 1,
+      stageProgress: { order: 1, type: "CONTACT", progress: 100, attempts: 1 },
+      round: 1,
+    });
+    // branch/branchSignal — опциональные поля именно ради этого случая: эмулируем старый
+    // NegotiationState, сохранённый в БД до появления ветвления.
+    delete legacyState.branch;
+    delete legacyState.branchSignal;
+
+    const { state: next } = evaluateTransition(legacyState, forkedLevel, null);
+
+    expect(next.branch).toBe("soft");
+  });
+});
+
 describe("evaluateTransition", () => {
   it("Stage может завершиться и перейти на следующую Stage внутри Level (advance-stage)", () => {
     const state = makeState({
@@ -111,7 +220,7 @@ describe("evaluateTransition", () => {
     expect(transition).toBe("fail-level");
     expect(next.negotiation.outcome).toBe("failed");
     expect(next.levelHistory).toEqual([
-      { levelOrder: 1, title: "Level 1", result: "failed", roundsUsed: 6, finalScore: 0 },
+      { levelOrder: 1, title: "Level 1", result: "failed", roundsUsed: 6, finalScore: 0, branch: null },
     ]);
   });
 
