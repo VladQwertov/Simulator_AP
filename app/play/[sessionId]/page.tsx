@@ -56,7 +56,9 @@ type Feedback = {
   keyMomentQuote: string | null;
   keyMomentExplanation: string | null;
   betterAnswer: string | null;
-  perLevelBreakdown: { levelOrder: number; title: string; result: "advanced" | "failed"; roundsUsed: number; finalScore: number }[] | null;
+  perLevelBreakdown:
+    | { levelOrder: number; title: string; result: "advanced" | "failed"; roundsUsed: number; finalScore: number; branch?: "soft" | "hard" | null }[]
+    | null;
   stageBreakdown: StageBreakdownEntry[] | null;
 };
 
@@ -440,6 +442,9 @@ export default function PlaySessionPage({ params }: { params: Promise<{ sessionI
                           <span className="text-muted">
                             Уровень {l.levelOrder} «{l.title}» — {l.result === "advanced" ? "пройден" : "провален"} (раундов:{" "}
                             {l.roundsUsed}, счёт: {l.finalScore})
+                            {l.branch && (
+                              <> — линия: {l.branch === "soft" ? "мягкая" : "жёсткая"}</>
+                            )}
                           </span>
                         </li>
                       ))}

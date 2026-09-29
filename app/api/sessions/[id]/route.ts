@@ -5,7 +5,7 @@
 // Только чтение — никакой игровой логики, только проекция уже посчитанного Engine state.
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { deriveOpponentMood } from "@/lib/engine";
+import { deriveOpponentMood, findStageByOrder } from "@/lib/engine";
 import type { NegotiationState } from "@/lib/engine/types";
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -32,7 +32,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const state = session.state as unknown as NegotiationState;
   const currentLevel = session.scenario.levels.find((l) => l.order === state.currentLevelOrder);
-  const currentStage = currentLevel?.stages.find((s) => s.order === state.currentStageOrder);
+  const currentStage = currentLevel ? findStageByOrder(currentLevel.stages, state.currentStageOrder, state.branch) : undefined;
 
   return NextResponse.json({
     sessionId: session.id,

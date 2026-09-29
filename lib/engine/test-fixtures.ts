@@ -3,7 +3,7 @@
 import type { LevelWithStages, NegotiationState, StageConfig } from "./types";
 
 export function makeStage(overrides: Partial<StageConfig> = {}): StageConfig {
-  return { order: 1, type: "CONTACT", ...overrides };
+  return { order: 1, type: "CONTACT", branchKey: null, ...overrides };
 }
 
 export function makeLevel(
@@ -31,6 +31,8 @@ export function makeState(overrides: Partial<NegotiationState> = {}): Negotiatio
     player: { concessions: 0, arguments: 0, questions: 0, pressure: 0, rapport: 0 },
     opponent: { trust: 50, resistance: 50, interest: 50, pressure: 0, hiddenGoals: "Test opponent goals" },
     stageProgress: { order: 1, type: "CONTACT", progress: 0, attempts: 0 },
+    branch: null,
+    branchSignal: { soft: 0, hard: 0 },
     negotiation: { agreementProbability: 0, outcome: null },
     levelHistory: [],
     ...overrides,

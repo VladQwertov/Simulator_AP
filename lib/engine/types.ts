@@ -41,9 +41,20 @@ export type LevelConfig = Pick<
   | "failThreshold"
 >;
 
-export type StageConfig = Pick<Stage, "order" | "type">;
+export type StageConfig = Pick<Stage, "order" | "type" | "branchKey">;
 
 export type LevelWithStages = LevelConfig & { stages: StageConfig[] };
+
+// Ветвление сценария (см. комментарий над моделью Stage в prisma/schema.prisma). Несколько Stage
+// могут делить один order внутри уровня — движок детерминированно выбирает вариант ("soft"/"hard")
+// по накопленному за уровень соотношению мягких/жёстких действий игрока и фиксирует выбор в
+// NegotiationState.branch на весь уровень.
+export type BranchKey = "soft" | "hard";
+
+export interface BranchSignal {
+  soft: number; // RAPPORT + CONCESSION реплики с начала текущего уровня
+  hard: number; // PRESSURE + ARGUMENT реплики с начала текущего уровня
+}
 
 export interface PlayerState {
   concessions: number;
@@ -80,6 +91,14 @@ export interface NegotiationState {
   opponent: OpponentState;
   stageProgress: StageProgressState;
 
+  // Ветвление текущего уровня: branch — выбранный вариант (null, пока развилка не пройдена или
+  // если в уровне развилок нет), branchSignal — счётчики с начала уровня, по которым движок решает,
+  // в какую сторону пойти в момент развилки (lib/engine/transition.ts). Оба сбрасываются на новом
+  // уровне. Опциональны в типе ради обратной совместимости с NegotiationState, сохранённым в БД до
+  // появления ветвления — apply.ts/transition.ts трактуют отсутствие как {soft:0,hard:0}/null.
+  branch?: BranchKey | null;
+  branchSignal?: BranchSignal;
+
   negotiation: {
     agreementProbability: number;
     outcome: NegotiationOutcome | null; // null, пока сценарий не завершён
@@ -96,4 +115,5 @@ export interface LevelHistoryEntry {
   result: LevelHistoryResult;
   roundsUsed: number;
   finalScore: number; // agreementProbability на момент завершения уровня
+  branch?: BranchKey | null; // какой вариант развилки был выбран на этом уровне (если она была)
 }

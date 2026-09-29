@@ -15,8 +15,8 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
 import { classifyAction, generateFeedback, generateOpponentReply } from "@/lib/llm/client";
-import { buildStageBreakdown, calculateOverallScore, deriveOpponentMood, pickKeyMoment, processTurn } from "@/lib/engine";
-import type { FeedbackTurnFact, NegotiationOutcome, NegotiationState, StageType } from "@/lib/engine";
+import { buildStageBreakdown, calculateOverallScore, deriveOpponentMood, findStageByOrder, pickKeyMoment, processTurn } from "@/lib/engine";
+import type { FeedbackTurnFact, NegotiationOutcome, NegotiationState } from "@/lib/engine";
 import type { HistoryTurn } from "@/lib/llm/prompts";
 
 // LLM-вызовы внутри транзакции могут занимать несколько секунд суммарно — дефолтный таймаут
@@ -93,7 +93,7 @@ export async function POST(
           throw new RouteError(500, "Текущий уровень сценария не найден");
         }
 
-        const stage = level.stages.find((s) => s.order === state.currentStageOrder);
+        const stage = findStageByOrder(level.stages, state.currentStageOrder, state.branch);
         if (!stage) {
           throw new RouteError(500, "Текущая стадия уровня не найдена");
         }
@@ -131,6 +131,7 @@ export async function POST(
             text: message,
             levelOrder: state.currentLevelOrder,
             stageOrder: state.currentStageOrder,
+            stageType: stage.type,
             actionType,
             actionQuality: quality,
           },
@@ -165,6 +166,7 @@ export async function POST(
             text: opponentReply,
             levelOrder: newState.currentLevelOrder,
             stageOrder: newState.currentStageOrder,
+            stageType: newState.stageProgress.type,
           },
         });
 
@@ -182,30 +184,24 @@ export async function POST(
           const outcome = newState.negotiation.outcome ?? "failed";
           const overallScore = calculateOverallScore(newState.levelHistory);
 
-          const allLevels = await tx.level.findMany({
-            where: { scenarioId: session.scenarioId },
-            select: { order: true, stages: { select: { order: true, type: true } } },
-          });
-          const resolveStageType = (levelOrder: number | null, stageOrder: number | null): StageType | null => {
-            if (levelOrder == null || stageOrder == null) return null;
-            const lvl = allLevels.find((l) => l.order === levelOrder);
-            return lvl?.stages.find((s) => s.order === stageOrder)?.type ?? null;
-          };
-
+          // stageType читается напрямую с уже сохранённых Turn (записан из Engine-состояния в
+          // момент создания хода, см. комментарий у поля Turn.stageType в schema.prisma) — без
+          // повторного резолва по (levelOrder, stageOrder): при ветвлении сценария несколько Stage
+          // могут делить один order внутри уровня, и резолв по одному order был бы неоднозначным.
           const feedbackTurns: FeedbackTurnFact[] = [
             ...session.turns.map((t) => ({
               role: t.role,
               text: t.text,
               actionType: t.actionType,
               actionQuality: t.actionQuality,
-              stageType: resolveStageType(t.levelOrder, t.stageOrder),
+              stageType: t.stageType,
             })),
             {
               role: "USER" as const,
               text: message,
               actionType,
               actionQuality: quality,
-              stageType: resolveStageType(state.currentLevelOrder, state.currentStageOrder),
+              stageType: stage.type,
             },
             { role: "OPPONENT" as const, text: opponentReply, actionType: null, actionQuality: null, stageType: null },
           ];
@@ -254,7 +250,7 @@ export async function POST(
         // Для отображения (Play UI): после advance-level "текущий" уровень — это nextLevel,
         // иначе — тот же level, но, возможно, другая (следующая) Stage внутри него.
         const displayLevel = transition === "advance-level" ? nextLevel! : level;
-        const displayStage = displayLevel.stages.find((s) => s.order === newState.currentStageOrder);
+        const displayStage = findStageByOrder(displayLevel.stages, newState.currentStageOrder, newState.branch);
 
         return {
           opponentReply,

@@ -49,4 +49,29 @@ describe("applyAction", () => {
     expect(next.opponent.trust).toBeLessThanOrEqual(100);
     expect(next.opponent.trust).toBeGreaterThanOrEqual(0);
   });
+
+  it("RAPPORT/CONCESSION копят soft-сигнал развилки, PRESSURE/ARGUMENT — hard", () => {
+    const level = makeLevel();
+    let state = makeState();
+
+    state = applyAction(state, level, level.stages[0], "RAPPORT", 80);
+    state = applyAction(state, level, level.stages[0], "CONCESSION", 80);
+    expect(state.branchSignal).toEqual({ soft: 2, hard: 0 });
+
+    state = applyAction(state, level, level.stages[0], "PRESSURE", 20);
+    state = applyAction(state, level, level.stages[0], "ARGUMENT", 60);
+    expect(state.branchSignal).toEqual({ soft: 2, hard: 2 });
+  });
+
+  it("QUESTION/CLARIFICATION/NEUTRAL/ABUSE не двигают branchSignal", () => {
+    const level = makeLevel();
+    let state = makeState();
+
+    state = applyAction(state, level, level.stages[0], "QUESTION", 70);
+    state = applyAction(state, level, level.stages[0], "CLARIFICATION", 70);
+    state = applyAction(state, level, level.stages[0], "NEUTRAL", 50);
+    state = applyAction(state, level, level.stages[0], "ABUSE", 0);
+
+    expect(state.branchSignal).toEqual({ soft: 0, hard: 0 });
+  });
 });

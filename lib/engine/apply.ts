@@ -31,11 +31,21 @@ export function applyAction(
     hiddenGoals: state.opponent.hiddenGoals,
   };
 
+  // Сигнал для развилки (lib/engine/transition.ts): копится с начала текущего уровня, сбрасывается
+  // withAdvanceLevel. ?? {soft:0,hard:0} — на случай NegotiationState, сохранённого до появления
+  // ветвления (см. комментарий у поля branchSignal в types.ts).
+  const prevSignal = state.branchSignal ?? { soft: 0, hard: 0 };
+  const branchSignal = {
+    soft: prevSignal.soft + (actionType === "RAPPORT" || actionType === "CONCESSION" ? 1 : 0),
+    hard: prevSignal.hard + (actionType === "PRESSURE" || actionType === "ARGUMENT" ? 1 : 0),
+  };
+
   return {
     ...state,
     round: state.round + 1,
     player,
     opponent,
+    branchSignal,
     stageProgress: {
       ...state.stageProgress,
       progress: clamp(state.stageProgress.progress + stageProgressDelta, 0, 100),

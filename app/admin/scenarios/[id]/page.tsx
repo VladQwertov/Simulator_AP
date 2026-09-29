@@ -11,6 +11,11 @@ type Stage = {
   type: StageType;
   title: string | null;
   description: string | null;
+  // null = основной путь; "soft"/"hard" = развилка — несколько Stage делят один order, движок
+  // сам выбирает вариант при игре (lib/engine/transition.ts). Здесь только для отображения:
+  // редактирование через админку не создаёт и не переносит развилки, только правит content
+  // существующего варианта.
+  branchKey: string | null;
 };
 
 type Level = {
@@ -436,6 +441,16 @@ function StageRow({
 
   return (
     <div className="rounded border border-black/10 p-3 dark:border-white/10">
+      {stage.branchKey && (
+        <div className="mb-2 flex items-center gap-1.5 text-xs">
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 font-medium text-amber-800 dark:bg-amber-900/40 dark:text-amber-300">
+            Развилка · order={stage.order} · вариант «{stage.branchKey === "soft" ? "мягкий" : "жёсткий"}»
+          </span>
+          <span className="text-black/40 dark:text-white/40">
+            движок выбирает автоматически по ходу игры, order у обоих вариантов совпадает намеренно
+          </span>
+        </div>
+      )}
       <div className="flex flex-wrap items-end gap-2">
         <div>
           <label className={labelCls}>type</label>
@@ -456,10 +471,20 @@ function StageRow({
           <input className={inputCls} value={description} onChange={(e) => setDescription(e.target.value)} />
         </div>
         <div className="flex gap-1">
-          <button className={btnCls} onClick={() => move("up")} disabled={isFirst} title="Вверх">
+          <button
+            className={btnCls}
+            onClick={() => move("up")}
+            disabled={isFirst || !!stage.branchKey}
+            title={stage.branchKey ? "Стадии развилки нельзя переставлять — это сломает пару" : "Вверх"}
+          >
             ↑
           </button>
-          <button className={btnCls} onClick={() => move("down")} disabled={isLast} title="Вниз">
+          <button
+            className={btnCls}
+            onClick={() => move("down")}
+            disabled={isLast || !!stage.branchKey}
+            title={stage.branchKey ? "Стадии развилки нельзя переставлять — это сломает пару" : "Вниз"}
+          >
             ↓
           </button>
           <button className={btnPrimaryCls} onClick={save} disabled={saving}>
